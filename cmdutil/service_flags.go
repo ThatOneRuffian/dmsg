@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log/syslog"
 	"net/http"
 	"os"
 	"strings"
@@ -14,12 +13,9 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
-	"github.com/sirupsen/logrus"
-	logrussyslog "github.com/sirupsen/logrus/hooks/syslog"
 	"github.com/skycoin/skycoin/src/util/logging"
 	"github.com/spf13/cobra"
 
-	"github.com/skycoin/dmsg/discord"
 	"github.com/skycoin/dmsg/promutil"
 )
 
@@ -111,50 +107,11 @@ func (sf *ServiceFlags) Check() error {
 		}
 	}
 
-	if _, _, err := LevelFromString(sf.LogLevel); err != nil {
-		return fmt.Errorf("%w: %s", ErrInvalidLogString, sf.LogLevel)
-	}
-
 	if err := ValidTag(sf.Tag); err != nil {
 		return fmt.Errorf("%w: %s", err, sf.Tag)
 	}
 
 	return nil
-}
-
-// Logger returns the logger as specified by the service flags.
-func (sf *ServiceFlags) Logger() *logging.Logger {
-	if alreadyDone(&sf.loggerDone) {
-		return sf.logger
-	}
-
-	log := logging.MustGetLogger(sf.Tag)
-	sf.logger = log
-
-	logLvl, sysLvl, err := LevelFromString(sf.LogLevel)
-	if err != nil {
-		panic(err) // should not happen as we have already checked earlier on
-	}
-	logging.SetLevel(logLvl)
-
-	if sf.Syslog != "" {
-		hook, err := logrussyslog.NewSyslogHook(sf.SyslogNet, sf.Syslog, sysLvl, sf.Tag)
-		if err != nil {
-			log.WithError(err).
-				WithField("net", sf.SyslogNet).
-				WithField("addr", sf.Syslog).
-				Fatal("Failed to connect to syslog daemon.")
-		}
-		logging.AddHook(hook)
-	}
-
-	if discordWebhookURL := discord.GetWebhookURLFromEnv(); discordWebhookURL != "" {
-		discordOpts := discord.GetDefaultOpts()
-		hook := discord.NewHook(sf.Tag, discordWebhookURL, discordOpts...)
-		logging.AddHook(hook)
-	}
-
-	return log
 }
 
 // ParseConfig parses config from service tags.
@@ -281,26 +238,6 @@ func ValidTag(tag string) error {
 	}
 
 	return nil
-}
-
-// LevelFromString returns a logrus.Level and syslog.Priority from a string identifier.
-func LevelFromString(s string) (logrus.Level, syslog.Priority, error) {
-	switch strings.ToLower(s) {
-	case "debug":
-		return logrus.DebugLevel, syslog.LOG_DEBUG, nil
-	case "info", "notice":
-		return logrus.InfoLevel, syslog.LOG_INFO, nil
-	case "warn", "warning":
-		return logrus.WarnLevel, syslog.LOG_WARNING, nil
-	case "error":
-		return logrus.ErrorLevel, syslog.LOG_ERR, nil
-	case "fatal", "critical":
-		return logrus.FatalLevel, syslog.LOG_CRIT, nil
-	case "panic":
-		return logrus.PanicLevel, syslog.LOG_EMERG, nil
-	default:
-		return logrus.DebugLevel, syslog.LOG_DEBUG, ErrInvalidLogString
-	}
 }
 
 func alreadyDone(done *bool) bool {

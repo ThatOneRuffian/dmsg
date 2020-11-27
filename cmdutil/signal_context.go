@@ -2,18 +2,14 @@ package cmdutil
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
-
-	"github.com/sirupsen/logrus"
 )
 
 // SignalContext returns a context that cancels on given syscall signals.
-func SignalContext(ctx context.Context, log logrus.FieldLogger) (context.Context, context.CancelFunc) {
-	if log == nil {
-		log = logrus.New()
-	}
+func SignalContext(ctx context.Context) (context.Context, context.CancelFunc) {
 
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -23,8 +19,7 @@ func SignalContext(ctx context.Context, log logrus.FieldLogger) (context.Context
 	go func() {
 		select {
 		case sig := <-ch:
-			log.WithField("signal", sig).
-				Info("Closing with received signal.")
+			fmt.Println("Closing with received signal.", sig)
 		case <-ctx.Done():
 		}
 		cancel()

@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/skycoin/dmsg"
 	"github.com/skycoin/dmsg/cipher"
 	"github.com/skycoin/dmsg/disc"
@@ -65,7 +64,7 @@ func (dg *DmsgGet) flagGroups() []FlagGroup {
 }
 
 // Run runs the download logic.
-func (dg *DmsgGet) Run(ctx context.Context, log logrus.FieldLogger, skStr string, args []string) (err error) {
+func (dg *DmsgGet) Run(ctx context.Context, skStr string, args []string) (err error) {
 
 	if dg.startF.Help {
 		dg.fs.Usage()
@@ -185,13 +184,13 @@ func parseOutputFile(name string, urlPath string) (*os.File, error) {
 }
 
 func (dg *DmsgGet) startDmsg(ctx context.Context, pk cipher.PubKey, sk cipher.SecKey) (dmsgC *dmsg.Client, stop func(), err error) {
-	dmsgC = dmsg.NewClient(pk, sk, disc.NewHTTP(dg.dmsgF.Disc), &dmsg.Config{MinSessions: dg.dmsgF.Sessions})
+	dmsgC = dmsg.NewClient(pk, sk, disc.NewHTTP("http://dmsg.discovery.skywire.skycoin.com"), &dmsg.Config{MinSessions: 1})
 	go dmsgC.Serve(context.Background())
 
 	stop = func() {
 		err := dmsgC.Close()
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println(err.Error())
 		}
 		fmt.Println("Disconnected from dmsg network.")
 	}

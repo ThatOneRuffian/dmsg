@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
-	"github.com/sirupsen/logrus"
 )
 
 // Catch panics on any non-nil error.
@@ -27,10 +25,10 @@ func CatchWithMsg(msg string, v ...interface{}) {
 }
 
 // CatchWithLog calls Fatal() on any non-nil error.
-func CatchWithLog(log logrus.FieldLogger, msg string, v ...interface{}) {
+func CatchWithLog(msg string, v ...interface{}) {
 	for _, val := range v {
 		if err, ok := val.(error); ok && err != nil {
-			log.WithError(err).Fatal(msg)
+			fmt.Println(err)
 			os.Exit(1)
 		}
 	}
