@@ -103,7 +103,6 @@ func (dg *DmsgGet) Run(ctx context.Context, skStr string, args []string) (err er
 	defer closeDmsg()
 
 	httpC := http.Client{Transport: dmsghttp.MakeHTTPTransport(dmsgC)}
-
 	for i := 0; i < dg.dlF.Tries; i++ {
 		fmt.Printf("Download attempt %d/%d ...", i, dg.dlF.Tries)
 
@@ -112,7 +111,7 @@ func (dg *DmsgGet) Run(ctx context.Context, skStr string, args []string) (err er
 		}
 
 		if err := Download(&httpC, file, u.URL.String()); err != nil {
-			fmt.Println(err.Error())
+			fmt.Println("Error:", err.Error())
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -190,7 +189,7 @@ func (dg *DmsgGet) startDmsg(ctx context.Context, pk cipher.PubKey, sk cipher.Se
 	stop = func() {
 		err := dmsgC.Close()
 		if err != nil {
-			fmt.Println(err.Error())
+			fmt.Println("Error:", err.Error())
 		}
 		fmt.Println("Disconnected from dmsg network.")
 	}

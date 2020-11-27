@@ -21,7 +21,7 @@ func main() {
 	defer cancel()
 
 	if err := dg.Run(ctx, skStr, flag.Args()); err != nil {
-		fmt.Println(err)
-		panic(1)
+		fmt.Println(err.Error())
+		os.Exit(1)
 	}
 }
