@@ -113,7 +113,7 @@ func (dg *DmsgGet) Run(ctx context.Context, log logrus.FieldLogger, skStr string
 		}
 
 		if err := Download(&httpC, file, u.URL.String()); err != nil {
-			fmt.Println(err)
+			fmt.Println(err.Error())
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
