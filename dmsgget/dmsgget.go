@@ -13,8 +13,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/skycoin/skycoin/src/util/logging"
-
 	"github.com/skycoin/dmsg"
 	"github.com/skycoin/dmsg/cipher"
 	"github.com/skycoin/dmsg/disc"
@@ -63,14 +61,11 @@ func (dg *DmsgGet) String() string {
 }
 
 func (dg *DmsgGet) flagGroups() []FlagGroup {
-	return []FlagGroup{&dg.startF, &dg.dmsgF, &dg.dlF, &dg.httpF}
+	return []FlagGroup{&dg.startF, &dg.dlF, &dg.httpF}
 }
 
 // Run runs the download logic.
 func (dg *DmsgGet) Run(ctx context.Context, log logrus.FieldLogger, skStr string, args []string) (err error) {
-	if log == nil {
-		log = logging.MustGetLogger("dmsgget")
-	}
 
 	if dg.startF.Help {
 		dg.fs.Usage()
@@ -93,16 +88,17 @@ func (dg *DmsgGet) Run(ctx context.Context, log logrus.FieldLogger, skStr string
 	}
 	defer func() {
 		if fErr := file.Close(); fErr != nil {
-			log.WithError(fErr).Warn("Failed to close output file.")
+			fmt.Println("Failed to close output file.")
 		}
 		if err != nil {
 			if rErr := os.RemoveAll(file.Name()); rErr != nil {
-				log.WithError(rErr).Warn("Failed to remove output file.")
+				fmt.Println("Failed to remove output file.")
+				panic(1)
 			}
 		}
 	}()
 
-	dmsgC, closeDmsg, err := dg.startDmsg(ctx, log, pk, sk)
+	dmsgC, closeDmsg, err := dg.startDmsg(ctx, pk, sk)
 	if err != nil {
 		return fmt.Errorf("failed to start dmsg: %w", err)
 	}
@@ -111,14 +107,14 @@ func (dg *DmsgGet) Run(ctx context.Context, log logrus.FieldLogger, skStr string
 	httpC := http.Client{Transport: dmsghttp.MakeHTTPTransport(dmsgC)}
 
 	for i := 0; i < dg.dlF.Tries; i++ {
-		log.Infof("Download attempt %d/%d ...", i, dg.dlF.Tries)
+		fmt.Println("Download attempt %d/%d ...", i, dg.dlF.Tries)
 
 		if _, err := file.Seek(0, 0); err != nil {
 			return fmt.Errorf("failed to reset file: %w", err)
 		}
 
-		if err := Download(log, &httpC, file, u.URL.String()); err != nil {
-			log.WithError(err).Error()
+		if err := Download(&httpC, file, u.URL.String()); err != nil {
+			fmt.Println(err)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -188,16 +184,18 @@ func parseOutputFile(name string, urlPath string) (*os.File, error) {
 
 	return nil, os.ErrExist
 }
-
 func (dg *DmsgGet) startDmsg(ctx context.Context, log logrus.FieldLogger, pk cipher.PubKey, sk cipher.SecKey) (dmsgC *dmsg.Client, stop func(), err error) {
+
 	dmsgC = dmsg.NewClient(pk, sk, disc.NewHTTP(dg.dmsgF.Disc), &dmsg.Config{MinSessions: dg.dmsgF.Sessions})
 	go dmsgC.Serve(context.Background())
 
 	stop = func() {
-		err := dmsgC.Close()
-		log.WithError(err).Info("Disconnected from dmsg network.")
-	}
+		if err := dmsgC.Close(); err != nil {
+			fmt.Println(err)
+		}
 
+		fmt.Println("Disconnected from dmsg network.")
+	}
 	log.WithField("public_key", pk.String()).WithField("dmsg_disc", dg.dmsgF.Disc).
 		Info("Connecting to dmsg network...")
 
@@ -207,25 +205,28 @@ func (dg *DmsgGet) startDmsg(ctx context.Context, log logrus.FieldLogger, pk cip
 		return nil, nil, ctx.Err()
 
 	case <-dmsgC.Ready():
-		log.Info("Dmsg network ready.")
+		fmt.Println("Dmsg network ready.")
 		return dmsgC, stop, nil
 	}
 }
 
 // Download downloads a file from the given URL into 'w'.
-func Download(log logrus.FieldLogger, httpC *http.Client, w io.Writer, urlStr string) error {
+func Download(httpC *http.Client, w io.Writer, urlStr string) error {
 	req, err := http.NewRequest(http.MethodGet, urlStr, nil)
 	if err != nil {
-		log.WithError(err).Fatal("Failed to formulate HTTP request.")
+		fmt.Println("Failed to formulate HTTP request.")
+		panic(1)
 	}
 
 	resp, err := httpC.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to connect to HTTP server: %w", err)
+		panic(1)
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			log.WithError(err).Warn("HTTP Response body closed with non-nil error.")
+			fmt.Println("HTTP Response body closed with non-nil error.")
+			panic(1)
 		}
 	}()
 
