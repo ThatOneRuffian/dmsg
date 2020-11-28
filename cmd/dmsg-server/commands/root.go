@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/getsentry/sentry-go"
@@ -44,20 +44,18 @@ var rootCmd = &cobra.Command{
 			log.Printf("Failed to output build info: %v", err)
 		}
 
-		log := sf.Logger()
-
 		if discordWebhookURL := discord.GetWebhookURLFromEnv(); discordWebhookURL != "" {
 			// Workaround for Discord logger hook. Actually, it's Info.
-			log.Error(discord.StartLogMessage)
-			defer log.Error(discord.StopLogMessage)
+			fmt.Println(discord.StartLogMessage)
+			defer fmt.Println(discord.StopLogMessage)
 		} else {
-			log.Info(discord.StartLogMessage)
-			defer log.Info(discord.StopLogMessage)
+			fmt.Println(discord.StartLogMessage)
+			defer fmt.Println(discord.StopLogMessage)
 		}
 
 		var conf Config
 		if err := sf.ParseConfig(os.Args, true, &conf); err != nil {
-			log.WithError(err).Fatal()
+			fmt.Println(err.Error())
 		}
 		if sentryDSN != "" {
 			err := sentry.Init(sentry.ClientOptions{
@@ -65,16 +63,17 @@ var rootCmd = &cobra.Command{
 				AttachStacktrace: true,
 			})
 			if err != nil {
-				log.Fatalf("sentry.Init: %s", err)
+				fmt.Println("sentry.Init: %s", err)
+				os.Exit(1)
 			}
 			defer sentry.Flush(2 * time.Second)
 		}
 
-		m := prepareMetrics(log, sf.Tag, sf.MetricsAddr)
+		m := prepareMetrics(sf.Tag, sf.MetricsAddr)
 
 		lis, err := net.Listen("tcp", conf.LocalAddress)
 		if err != nil {
-			log.Fatalf("Error listening on %s: %v", conf.LocalAddress, err)
+			fmt.Printf("Error listening on %s: %v\n", conf.LocalAddress, err)
 		}
 
 		srvConf := dmsg.ServerConfig{
@@ -82,16 +81,19 @@ var rootCmd = &cobra.Command{
 			UpdateInterval: conf.UpdateInterval,
 		}
 		srv := dmsg.NewServer(conf.PubKey, conf.SecKey, disc.NewHTTP(conf.Discovery), &srvConf, m)
-		srv.SetLogger(log)
+		//srv.SetLogger(log)
 
-		defer func() { log.WithError(srv.Close()).Info("Closed server.") }()
+		defer func() {
+			fmt.Println("Closed server.")
+			os.Exit(1)
+		}()
 
-		ctx, cancel := cmdutil.SignalContext(context.Background(), log)
+		ctx, cancel := cmdutil.SignalContext(context.Background())
 		defer cancel()
 
 		go func() {
 			if err := srv.Serve(lis, conf.PublicAddress); err != nil {
-				log.Errorf("Serve: %v", err)
+				fmt.Println("Serve: %v", err)
 				cancel()
 			}
 		}()
@@ -112,7 +114,7 @@ type Config struct {
 	LogLevel       string        `json:"log_level"`
 }
 
-func prepareMetrics(log logrus.FieldLogger, tag, addr string) servermetrics.Metrics {
+func prepareMetrics(tag, addr string) servermetrics.Metrics {
 	if addr == "" {
 		return servermetrics.NewEmpty()
 	}
@@ -128,8 +130,12 @@ func prepareMetrics(log logrus.FieldLogger, tag, addr string) servermetrics.Metr
 
 	promutil.AddMetricsHandle(r, m.Collectors()...)
 
-	log.WithField("addr", addr).Info("Serving metrics...")
-	go func() { log.Fatalln(http.ListenAndServe(addr, r)) }()
+	fmt.Println("addr", addr)
+	fmt.Println("Serving metrics...")
+	go func() {
+		fmt.Println(http.ListenAndServe(addr, r))
+		os.Exit(1)
+	}()
 
 	return m
 }
@@ -137,6 +143,7 @@ func prepareMetrics(log logrus.FieldLogger, tag, addr string) servermetrics.Metr
 // Execute executes root CLI command.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatal(err)
+		fmt.Println(err.Error())
+		os.Exit(1)
 	}
 }

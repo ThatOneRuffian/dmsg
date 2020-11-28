@@ -37,7 +37,7 @@ func parse() (err error) {
 func main() {
 	log := logging.MustGetLogger("dmsg-example-http-server")
 
-	ctx, cancel := cmdutil.SignalContext(context.Background(), log)
+	ctx, cancel := cmdutil.SignalContext(context.Background())
 	defer cancel()
 
 	if err := parse(); err != nil {
