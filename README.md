@@ -1,4 +1,6 @@
-[![Build Status](https://travis-ci.com/skycoin/dmsg.svg?branch=master)](https://travis-ci.com/skycoin/dmsg)
+## **Info**: *Fork of skycoin's dmsg project to compile experimental dmsgget, dmsg-http-server, and gen-keys binaries for Windows OS.*
+<br />
+<br />
 
 # dmsg
 
